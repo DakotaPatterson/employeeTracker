@@ -1,6 +1,8 @@
 const express = require('express');
 const mysql = require('mysql2');
 const inquirer = require('inquirer');
+require('dotenv').config();
+const logo = require('asciiart-logo');
 
 const PORT = process.env.PORT || 3001;
 const app = express();
@@ -10,20 +12,35 @@ app.use(express.json());
 
 const db = mysql.createConnection(
     {
-      host: 'localhost',
-      // MySQL username,
-      user: 'root',
-      // MySQL password
-      password: 'Wahya.1093',
-      database: 'employees_db'
+      host: process.env.DB_HOST,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_DATABASE
     },
-    console.log(`Connected to the courses_db database.`)
+    console.log(`Connected to the employees_db database.`)
   );
 
 
+  const logoConfig = {
+    name: 'Employee Manager',
+    font: 'Doom',
+    lineChars: 10,
+    padding: 2,
+    margin: 3,
+    borderColor: 'grey',
+    logoColor: 'bold-green',
+    textColor: 'green'
+};
 
+// Generate the logo
+const generatedLogo = logo(logoConfig).render();
+
+// Display the logo in the console
+console.log(generatedLogo);
 
   async function main() {
+    try{
+      while (true) {
     const answer = await inquirer.prompt({
         type: 'list',
         name: 'choice',
@@ -51,66 +68,71 @@ const db = mysql.createConnection(
      switch (answer.choice) {
       case 'View All Employees':
           // Call function to view all employees
-          allEmployees();
+          await allEmployees();
           break;
       case 'View All Employees By Department':
           // Call function to view employees by department
-          employeesByDepartment();
+          await employeesByDepartment();
           break;
       case 'View All Employees By Manager':
           // Call function to view employees by manager
-          employeesByManager();
+          await employeesByManager();
           break;
       case 'Add Employee':
           // Call function to add an employee
-          addEmployee();
+          await addEmployee();
           break;
       case 'Remove Employee':
           // Call function to remove an employee
-          removeEmployee();
+          await removeEmployee();
           break;
       case 'Update Employee Role':
           // Call function to update employee role
-          updateEmployeeRole();
+          await updateEmployeeRole();
           break;
       case 'Update Employee Manager':
           // Call function to update employee manager
-          updateEmployeeManager();
+          await updateEmployeeManager();
           break;
       case 'View All Roles':
           // Call function to view all roles
-          allRoles();
+          await allRoles();
           break;
       case 'Add Role':
           // Call function to add a role
-          addRole();
+          await addRole();
           break;
       case 'Remove Role':
           // Call function to remove a role
-          removeRole();
+          await removeRole();
           break;
       case 'View All Departments':
           // Call function to view all departments
-          allDepartments();
+          await allDepartments();
           break;
       case 'Add Department':
           // Call function to add a department
-          addDepartment();
+          await addDepartment();
           break;
       case 'Remove Department':
           // Call function to remove a department
-          removeDepartment();
+          await removeDepartment();
           break;
       case 'View Total Utilized Budget By Department':
           // Call function to view total utilized budget by department
-          totalBudget();
+          await totalBudget();
           break;
       case 'Quit':
           console.log('Goodbye!');
+          await db.end();
           process.exit();
+        }
+      }
+    } catch (error) {
+      console.error('Error in main function:', error);
+    }
   }
-  } 
-
+  
 // Function to view all employees
 async function allEmployees() {
   // Query database to retrieve all employees
@@ -120,7 +142,6 @@ async function allEmployees() {
     rows.forEach(row => {
         console.log(`ID: ${row.id}, Name: ${row.first_name} ${row.last_name}, Role ID: ${row.role_id}, Manager ID: ${row.manager_id}`);
       });
-      main();
 } catch (error) {
     console.error("Error viewing employees:", error);
 }
@@ -141,7 +162,6 @@ async function employeesByDepartment() {
         }
         console.log(`ID: ${row.id}, Name: ${row.first_name} ${row.last_name}, Role ID: ${row.role_id}, Manager ID: ${row.manager_id}`);
     });
-    main();
 } catch (error) {
     console.error("Error viewing employees by department:", error);
 }
@@ -162,7 +182,6 @@ async function employeesByManager() {
         }
         console.log(`ID: ${row.id}, Name: ${row.first_name} ${row.last_name}, Role ID: ${row.role_id}, Manager ID: ${row.manager_id}`);
     });
-    main();
 } catch (error) {
     console.error("Error viewing employees by manager:", error);
 }
@@ -176,37 +195,57 @@ async function addEmployee() {
         {
             type: 'input',
             name: 'first_name',
-            message: 'Enter employee\'s first name:'
+            message: 'Enter employee\'s first name:',
+            validate: function(input) {
+              if (input.trim() === '') {
+                  return 'Please enter a first name.';
+              }
+              return true;
+          }
         },
         {
             type: 'input',
             name: 'last_name',
-            message: 'Enter employee\'s last name:'
+            message: 'Enter employee\'s last name:',
+            validate: function(input) {
+              if (input.trim() === '') {
+                  return 'Please enter a last name.';
+              }
+              return true;
+          }
         },
         {
             type: 'input',
             name: 'role_id',
-            message: 'Enter employee\'s role ID:'
+            message: 'Enter employee\'s role ID:',
+            validate: function(input) {
+              if (input.trim() === '') {
+                  return 'Please enter a role id.';
+              }
+              return true;
+          }
         },
         {
             type: 'input',
             name: 'manager_id',
-            message: 'Enter employee\'s manager ID:'
-        }
-      ]).then(answers => {
-          // Add the employee to the database
-        db.insert('employee').values({
-            first_name: answers.first_name,
-            last_name: answers.last_name,
-            role_id: answers.role_id,
-            manager_id: answers.manager_id
-        }).execute().then(() => {
-            console.log(`Employee ${answers.first_name} ${answers.last_name} added successfully.`);
-        });
-        main();
-    });
-}
-}
+            message: 'Enter employee\'s manager ID:',
+            validate: function(input) {
+              if (input.trim() === '') {
+                  return 'Please enter a manager id.';
+              }
+              return true;
+            }
+          }
+        ]);
+        
+      // Add the employee to the database
+      await db.query("INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES (?, ?, ?, ?)", [answers.first_name, answers.last_name, answers.role_id, answers.manager_id]);
+      
+      console.log(`Employee ${answers.first_name} ${answers.last_name} added successfully.`);
+    } catch (error) {
+        console.error("Error adding employee:", error);
+    }
+  }
 
 // Function to remove an employee
 async function removeEmployee() {
@@ -223,7 +262,6 @@ async function removeEmployee() {
      // Delete the selected employee from the database
     await db.query("DELETE FROM employee WHERE id = ?", [answer.employee_id]);
     console.log("Employee removed successfully.");
-    main();
   } catch (error) {
       console.error("Error removing employee:", error);
   }
@@ -245,13 +283,19 @@ async function updateEmployeeRole() {
         {
             type: 'input',
             name: 'new_role_id',
-            message: 'Enter new role ID:'
+            message: 'Enter new role ID:',
+            validate: async function(input) {
+              const [rows, fields] = await db.query("SELECT * FROM role WHERE id = ?", [input]);
+              if (rows.length === 0) {
+                  return 'Invalid role ID. Please enter a valid role ID.';
+              }
+              return true;
+          }
         }
     ]);
     // Update the employee's role in the database
     await db.query("UPDATE employee SET role_id = ? WHERE id = ?", [answer.new_role_id, answer.employee_id]);
     console.log("Employee role updated successfully.");
-    main();
 } catch (error) {
     console.error("Error updating employee role:", error);
 }
@@ -279,7 +323,6 @@ async function updateEmployeeManager() {
     // Update the employee's manager in the database
     await db.query("UPDATE employee SET manager_id = ? WHERE id = ?", [answer.new_manager_id, answer.employee_id]);
     console.log("Employee manager updated successfully.");
-    main();
 } catch (error) {
     console.error("Error updating employee manager:", error);
 }
@@ -295,7 +338,6 @@ async function allRoles() {
        // Display the result
         console.log(`ID: ${row.id}, Title: ${row.title}, Salary: ${row.salary}, Department ID: ${row.department_id}`);
       });
-      main();
 } catch (error) {
     console.error("Error viewing roles:", error);
 }
@@ -325,7 +367,6 @@ async function addRole() {
     // Add the role to the database
     await db.query("INSERT INTO role (title, salary, department_id) VALUES (?, ?, ?)", [answers.title, answers.salary, answers.department_id]);
     console.log(`Role ${answers.title} added successfully.`);
-    main();
 } catch (error) {
     console.error("Error adding role:", error);
 }
@@ -346,7 +387,6 @@ async function removeRole() {
     // Delete the selected role from the database
     await db.query("DELETE FROM role WHERE id = ?", [answer.role_id]);
     console.log("Role removed successfully.");
-    main();
 } catch (error) {
     console.error("Error removing role:", error);
 }
@@ -362,7 +402,6 @@ async function allDepartments() {
       // Display the result
         console.log(`ID: ${row.id}, Name: ${row.name}`);
     });
-    main();
 } catch (error) {
     console.error("Error viewing departments:", error);
 }
@@ -380,7 +419,6 @@ async function addDepartment() {
     // Add the department to the database
     await db.query("INSERT INTO department (name) VALUES (?)", [answer.name]);
     console.log(`Department ${answer.name} added successfully.`);
-    main();
 } catch (error) {
     console.error("Error adding department:", error);
 }
@@ -401,7 +439,6 @@ async function removeDepartment() {
      // Delete the selected department from the database
     await db.query("DELETE FROM department WHERE id = ?", [answer.department_id]);
     console.log("Department removed successfully.");
-    main();
 } catch (error) {
     console.error("Error removing department:", error);
 }
@@ -417,11 +454,10 @@ async function totalBudget() {
     rows.forEach(row => {
         console.log(`Department: ${row.department_name}, Total Budget: ${row.total_budget}`);
     });
-    main();
 } catch (error) {
     console.error("Error calculating total budget:", error);
 }
 }
 
 // Call the main function to start the application
-main();
+main().catch(error => console.error('Error:', error));
