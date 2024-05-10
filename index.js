@@ -260,8 +260,8 @@ async function addEmployee() {
         name: "manager_id",
         message: "Choose employee's manager:",
         choices: managers.map(manager => ({
-          name: `${manager.manager_first_name} ${manager.manager_last_name}`,
-          value: manager.manager_id
+          name: `${manager.first_name} ${manager.last_name}`,
+          value: manager.id
         }))
       }
     ]);
@@ -613,7 +613,7 @@ async function removeDepartment() {
   // Prompt user to select a department to remove
   try {
     // Prompt user to select the department to remove
-    const departments = await getDepartments(); // Assume you have a function to fetch department names
+    const departments = await getDepartments(); 
     const answer = await inquirer.prompt([
       {
         type: "list",
