@@ -141,6 +141,7 @@ async function allEmployees() {
 
   console.log("All Employees:");
   console.table(data);
+  console.log(); // Insert a line break
   main(); // Call the main function after printing the data
 } catch (error) {
   console.error("Error viewing employees:", error);
@@ -163,6 +164,7 @@ async function employeesByDepartment() {
 
     console.log("Employees By Department:");
     console.table(data);
+    console.log(); // Insert a line break
     main();
   } catch (error) {
     console.error("Error viewing employees by department:", error);
@@ -207,15 +209,23 @@ async function employeesByManager() {
 
       console.log(`Employees under Manager ${managers.find(manager => manager.value === managerId).name}:`);
       console.table(employees);
+      console.log(); // Insert a line break
       main();
   } catch (error) {
       console.error("Error viewing employees by manager:", error);
   }
 }
+
 // Function to add an employee
 async function addEmployee() {
-  // Prompt user for employee details
   try {
+      // Fetch roles from the database
+     const roles = await getRoles();
+
+     // Fetch managers from the database
+    const managers = await getManagers();
+
+    // Prompt user for employee details
     const answers = await inquirer.prompt([
       {
         type: "input",
@@ -240,66 +250,80 @@ async function addEmployee() {
         },
       },
       {
-        type: "input",
+        type: "list",
         name: "role_id",
-        message: "Enter employee's role ID:",
-        validate: function (input) {
-          if (input.trim() === "") {
-            return "Please enter a role id.";
-          }
-          return true;
-        },
+        message: "Choose employee's role:",
+        choices: roles.map(role => ({ name: role.title, value: role.id })),
       },
       {
-        type: "input",
+        type: "list",
         name: "manager_id",
-        message: "Enter employee's manager ID:",
-        validate: function (input) {
-          if (input.trim() === "") {
-            return "Please enter a manager id.";
-          }
-          return true;
-        },
-      },
+        message: "Choose employee's manager:",
+        choices: managers.map(manager => ({
+          name: `${manager.manager_first_name} ${manager.manager_last_name}`,
+          value: manager.manager_id
+        }))
+      }
     ]);
 
     // Add the employee to the database
-    db.query(
-      "INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES (?, ?, ?, ?)",
+    const result = await new Promise((resolve, reject) => {
+      db.query("INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES (?, ?, ?, ?)",
       [
         answers.first_name,
         answers.last_name,
         answers.role_id,
         answers.manager_id,
-      ]
-    );
-
+      ], 
+      function (err, result) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(result);
+        }
+      });
+    });
     console.log(
       `Employee ${answers.first_name} ${answers.last_name} added successfully.`
     );
+    console.log(); // Insert a line break
+    main();
   } catch (error) {
     console.error("Error adding employee:", error);
   }
 }
 
+
 // Function to remove an employee
 async function removeEmployee() {
   // Prompt user to select an employee to remove
   try {
-    const employees = db.query("SELECT * FROM employee");
-    const choices = employees.map((employee) => ({
-      name: `${employee.first_name} ${employee.last_name}`,
-      value: employee.id,
-    }));
-    const answer = inquirer.prompt({
+    const employees = await getEmployees(); 
+    const answer = await inquirer.prompt([
+      {
       type: "list",
       name: "employee_id",
       message: "Select employee to remove:",
-      choices: choices,
-    });
+      choices: employees.map(employee => ({
+        name: `${employee.first_name} ${employee.last_name}`,
+        value: employee.id
+      }))
+    }
+  ]);
     // Delete the selected employee from the database
-    db.query("DELETE FROM employee WHERE id = ?", [answer.employee_id]);
+    await new Promise((resolve, reject) => {
+    db.query("DELETE FROM employee WHERE id = ?", [answer.employee_id], function (err, result) {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(result);
+      }
+    });
+  });
+
     console.log("Employee removed successfully.");
+    console.log(); // Insert a line break
+    main();
   } catch (error) {
     console.error("Error removing employee:", error);
   }
@@ -309,39 +333,51 @@ async function removeEmployee() {
 async function updateEmployeeRole() {
   // Prompt user to select an employee and their new role
   try {
-    const employees = db.query("SELECT * FROM employee");
-    const choices = employees.map((employee) => ({
-      name: `${employee.first_name} ${employee.last_name}`,
-      value: employee.id,
-    }));
+
+    // Fetch list of employees
+    const employees = await getEmployees();
+
+    //Fetch list of roles
+    const roles = await getRoles();
+ 
     const answer = await inquirer.prompt([
       {
         type: "list",
         name: "employee_id",
         message: "Select employee to update:",
-        choices: choices,
+        choices: employees.map(employee => ({
+          name: `${employee.first_name} ${employee.last_name}`,
+          value: employee.id
+      }))
       },
       {
-        type: "input",
+        type: "list",
         name: "new_role_id",
-        message: "Enter new role ID:",
-        validate: async function (input) {
-          const [rows, fields] = db.query("SELECT * FROM role WHERE id = ?", [
-            input,
-          ]);
-          if (rows.length === 0) {
-            return "Invalid role ID. Please enter a valid role ID.";
-          }
-          return true;
-        },
-      },
+        message: "Select new role:",
+        choices: roles.map(role => ({
+          name: role.title,
+          value: role.id
+        }))
+      }
     ]);
+
+
     // Update the employee's role in the database
+    const result = await new Promise((resolve, reject) => {
     db.query("UPDATE employee SET role_id = ? WHERE id = ?", [
       answer.new_role_id,
       answer.employee_id,
-    ]);
+    ], function (err, data) {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(data);
+      }
+    });
+  });
     console.log("Employee role updated successfully.");
+    console.log(); // Insert a line break
+    main();
   } catch (error) {
     console.error("Error updating employee role:", error);
   }
@@ -351,30 +387,50 @@ async function updateEmployeeRole() {
 async function updateEmployeeManager() {
   // Prompt user to select an employee and their new manager
   try {
-    const employees = db.query("SELECT * FROM employee");
-    const choices = employees.map((employee) => ({
-      name: `${employee.first_name} ${employee.last_name}`,
-      value: employee.id,
-    }));
+
+    // Fetch list of employees
+    const employees = await getEmployees();
+
+    // Fetch list of managers (excluding the selected employee)
+    const managers = await getManagers();
+
     const answer = await inquirer.prompt([
       {
         type: "list",
-        name: "employee_id",
+        name: "employeeID",
         message: "Select employee to update:",
-        choices: choices,
+      choices: employees.map(employee => ({
+          name: `${employee.first_name} ${employee.last_name}`,
+          value: employee.id
+      }))
       },
       {
-        type: "input",
+        type: "list",
         name: "new_manager_id",
-        message: "Enter new manager ID:",
-      },
+        message: "Select the new manager for the employee:",
+        choices: managers.map(manager => ({
+          name: `${manager.first_name} ${manager.last_name}`,
+          value: manager.id
+        }))
+      }
     ]);
+
     // Update the employee's manager in the database
+    const result = await new Promise((resolve, reject) => {
     db.query("UPDATE employee SET manager_id = ? WHERE id = ?", [
       answer.new_manager_id,
-      answer.employee_id,
-    ]);
+      answer.employeeID,
+    ],function (err, result) {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(result);
+      }
+    });
+  });
     console.log("Employee manager updated successfully.");
+    console.log(); // Insert a line break
+    main();
   } catch (error) {
     console.error("Error updating employee manager:", error);
   }
@@ -384,14 +440,20 @@ async function updateEmployeeManager() {
 async function allRoles() {
   // Query database to retrieve all roles
   try {
-    const [rows, fields] = db.query("SELECT * FROM role");
-    console.log("All Roles:");
-    rows.forEach((row) => {
-      // Display the result
-      console.log(
-        `ID: ${row.id}, Title: ${row.title}, Salary: ${row.salary}, Department ID: ${row.department_id}`
-      );
+    const data = await new Promise((resolve, reject) => {
+    db.query("SELECT * FROM role", function (err, data) {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(data);
+      }
     });
+  });
+
+    console.log("All Roles:");
+    console.table(data);
+    console.log(); // Insert a line break
+    main();
   } catch (error) {
     console.error("Error viewing roles:", error);
   }
@@ -406,44 +468,81 @@ async function addRole() {
         type: "input",
         name: "title",
         message: "Enter role title:",
+        validate: function (input) {
+          if (input.trim() === "") {
+            return "Please enter a role title.";
+          }
+          return true;
+        },
       },
       {
         type: "input",
         name: "salary",
         message: "Enter role salary:",
+        validate: function (input) {
+          if (input.trim() === "") {
+            return "Please enter a role salary.";
+          }
+          return true;
+        },
       },
       {
         type: "input",
         name: "department_id",
-        message: "Enter department ID:",
+        message: "Enter department ID:"
       },
     ]);
+
     // Add the role to the database
-    db.query(
-      "INSERT INTO role (title, salary, department_id) VALUES (?, ?, ?)",
-      [answers.title, answers.salary, answers.department_id]
-    );
+    const result = await new Promise((resolve, reject) => {
+    db.query("INSERT INTO role (title, salary, department_id) VALUES (?, ?, ?)", [answers.title, answers.salary, answers.department_id], function (err, result) {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(result);
+      }
+    });
+  });
     console.log(`Role ${answers.title} added successfully.`);
+    console.log(); // Insert a line break
+    main();
   } catch (error) {
     console.error("Error adding role:", error);
   }
 }
 
+
 // Function to remove a role
 async function removeRole() {
   // Prompt user to select a role to remove
   try {
-    const roles = db.query("SELECT * FROM role");
-    const choices = roles.map((role) => ({ name: role.title, value: role.id }));
-    const answer = await inquirer.prompt({
-      type: "list",
-      name: "role_id",
-      message: "Select role to remove:",
-      choices: choices,
-    });
+    const roles = await getRoles(); 
+    const answer = await inquirer.prompt([
+      {
+        type: "list",
+        name: "roleID",
+        message: "Select the role to remove:",
+        choices: roles.map(role => ({
+          name: role.title,
+          value: role.id
+        }))
+      }
+    ]);
+
     // Delete the selected role from the database
-    db.query("DELETE FROM role WHERE id = ?", [answer.role_id]);
+    await new Promise((resolve, reject) => {
+    db.query("DELETE FROM role WHERE id = ?", [answer.roleID],function (err, result) {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(result);
+      }
+    });
+  });
+
     console.log("Role removed successfully.");
+    console.log(); // Insert a line break
+    main();
   } catch (error) {
     console.error("Error removing role:", error);
   }
@@ -452,30 +551,58 @@ async function removeRole() {
 // Function to view all departments
 async function allDepartments() {
   // Query database to retrieve all departments
-  try {
-    const [rows, fields] = await db.query("SELECT * FROM department");
-    console.log("All Departments:");
-    rows.forEach((row) => {
-      // Display the result
-      console.log(`ID: ${row.id}, Name: ${row.name}`);
-    });
-  } catch (error) {
-    console.error("Error viewing departments:", error);
-  }
-}
+      try {
+        const data = await new Promise((resolve, reject) => {
+        db.query("SELECT * FROM department", function (err, data) {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(data);
+          }
+        });
+      });
+    
+        console.log("All Departments:");
+        console.table(data);
+        console.log(); // Insert a line break
+        main();
+      } catch (error) {
+        console.error("Error viewing Departments:", error);
+      }
+    }
 
 // Function to add a department
 async function addDepartment() {
-  // Prompt user for department details
   try {
-    const answer = await inquirer.prompt({
-      type: "input",
-      name: "name",
-      message: "Enter department name:",
-    });
+    // Prompt user for department details
+    const answer = await inquirer.prompt([
+      {
+        type: "input",
+        name: "name",
+        message: "Enter department name:",
+        validate: function (input) {
+          if (input.trim() === "") {
+            return "Please enter a department name.";
+          }
+          return true;
+        },
+      }
+    ]);
+
     // Add the department to the database
-    db.query("INSERT INTO department (name) VALUES (?)", [answer.name]);
-    console.log(`Department ${answer.name} added successfully.`);
+    const result = await new Promise((resolve, reject) => {
+      db.query("INSERT INTO department (name) VALUES (?)", [answer.name], function (err, result) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(result);
+        }
+      });
+    });
+
+    console.log(`Department '${answer.name}' added successfully.`);
+    console.log(); // Insert a line break
+    main();
   } catch (error) {
     console.error("Error adding department:", error);
   }
@@ -485,20 +612,34 @@ async function addDepartment() {
 async function removeDepartment() {
   // Prompt user to select a department to remove
   try {
-    const departments = db.query("SELECT * FROM department");
-    const choices = departments.map((department) => ({
-      name: department.name,
-      value: department.id,
-    }));
-    const answer = await inquirer.prompt({
-      type: "list",
-      name: "department_id",
-      message: "Select department to remove:",
-      choices: choices,
+    // Prompt user to select the department to remove
+    const departments = await getDepartments(); // Assume you have a function to fetch department names
+    const answer = await inquirer.prompt([
+      {
+        type: "list",
+        name: "departmentId",
+        message: "Select the department to remove:",
+        choices: departments.map(department => ({
+          name: department.name,
+          value: department.id
+        }))
+      }
+    ]);
+
+    // Remove the selected department from the database
+    await new Promise((resolve, reject) => {
+      db.query("DELETE FROM department WHERE id = ?", [answer.departmentId], function (err, result) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(result);
+        }
+      });
     });
-    // Delete the selected department from the database
-    db.query("DELETE FROM department WHERE id = ?", [answer.department_id]);
+
     console.log("Department removed successfully.");
+    console.log(); // Insert a line break
+    main();
   } catch (error) {
     console.error("Error removing department:", error);
   }
@@ -508,19 +649,89 @@ async function removeDepartment() {
 async function totalBudget() {
   // Calculate total utilized budget for each department
   try {
-    const [rows, fields] = db.query(
-      "SELECT department.name AS department_name, SUM(role.salary) AS total_budget FROM employee INNER JOIN role ON employee.role_id = role.id INNER JOIN department ON role.department_id = department.id GROUP BY department.id"
-    );
-    console.log("Total Utilized Budget By Department:");
-    // Display the result
-    rows.forEach((row) => {
-      console.log(
-        `Department: ${row.department_name}, Total Budget: ${row.total_budget}`
-      );
+    // SQL query to calculate total utilized budget by department
+    const sqlQuery = `
+      SELECT department.name AS department_name, SUM(role.salary) AS total_budget
+      FROM department
+      INNER JOIN role ON department.id = role.department_id
+      GROUP BY department.name
+    `;
+
+    // Execute the SQL query
+    const result = await new Promise((resolve, reject) => {
+      db.query(sqlQuery, (err, result) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(result);
+        }
+      });
     });
+
+ // Display the total utilized budget for each department
+    console.log("Total Utilized Budget by Department:");
+    result.forEach(row => {
+      console.log(`${row.department_name}: $${row.total_budget}`);
+    });
+
+    console.log(); // Insert a line break
+    main(); // Return to the main menu
   } catch (error) {
-    console.error("Error calculating total budget:", error);
+    console.error("Error viewing total utilized budget by department:", error);
   }
 }
+
+//Used to retrieve the departments
+async function getDepartments() {
+  return new Promise((resolve, reject) => {
+    db.query("SELECT id, name FROM department", (err, rows) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(rows);
+      }
+    });
+  });
+}
+
+//Used to retrieve the roles
+async function getRoles() {
+  return new Promise((resolve, reject) => {
+    db.query("SELECT id, title FROM role", (err, rows) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(rows);
+      }
+    });
+  });
+}
+
+//Used to retrieve the employees
+async function getEmployees() {
+  return new Promise((resolve, reject) => {
+    db.query("SELECT id, first_name, last_name FROM employee", (err, rows) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(rows);
+      }
+    });
+  });
+}
+
+//Used to retrieve the employees
+async function getManagers() {
+  return new Promise((resolve, reject) => {
+    db.query("SELECT * FROM employee WHERE manager_id IS NULL", (err, managers) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(managers);
+      }
+    });
+  });
+}
+
 
 main();
