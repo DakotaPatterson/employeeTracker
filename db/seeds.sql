@@ -1,3 +1,5 @@
+USE employees_db;
+
 INSERT INTO department (name)
 VALUES ('Sales'),
        ('Engineering'),
@@ -17,10 +19,10 @@ VALUES ('Sales Lead', 100000, 1),
 
 INSERT INTO employee (first_name, last_name, role_id, manager_id)
 VALUES ('John', 'Doe', 1, NULL),
-       ('Mike', 'Chan', 1, 1),
-       ('Ashley', 'Rodriguez', 2, null),
-       ('Kevin', 'Tupik', 2, 3),
-       ('Kunal', 'Singh', 3, null),
-       ('Malia', 'Brown', 3, 5),
-       ('Sarah', 'Lourd', 4, null),
-       ('Tom', 'Allen', 4, 7);
+       ('Mike', 'Chan', 2, 1),
+       ('Ashley', 'Rodriguez', 3, NULL),
+       ('Kevin', 'Tupik', 4, 3),
+       ('Kunal', 'Singh', 5, NULL),
+       ('Malia', 'Brown', 6, 5),
+       ('Sarah', 'Lourd', 7, NULL),
+       ('Tom', 'Allen', 8, 7);
